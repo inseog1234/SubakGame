@@ -1,138 +1,127 @@
-const { Engine, Render, Runner, Bodies, Composite, Events } = Matter;
-
-const WIDTH = 620;
-const HEIGHT = 800;
-const WALL = 30;
-const FLOOR_Y = 785;
-const SPAWN_Y = 90;
-const DROP_DELAY_MS = 350;
-
-// The first five fruit types can be dropped. Future fruit types can be added here.
-const fruits = [
-  { name: '체리', file: '00_cherry.png', radius: 18 },
-  { name: '딸기', file: '01_strawberry.png', radius: 24 },
-  { name: '포도', file: '02_grape.png', radius: 30 },
-  { name: '귤', file: '03_gyool.png', radius: 37 },
-  { name: '오렌지', file: '04_orange.png', radius: 45 }
-];
+var Engine = Matter.Engine,
+    Render = Matter.Render,
+    Runner = Matter.Runner,
+    Bodies = Matter.Bodies,
+    World = Matter.World;
 
 const engine = Engine.create();
+
 const render = Render.create({
-  engine,
-  element: document.getElementById('game'),
-  options: { width: WIDTH, height: HEIGHT, wireframes: false, background: '#F7F4C8' }
+    engine,
+    element : document.body,
+    options: {
+        wireframes: false,
+        background: '#F7F4C8',
+        width: 620,
+        height: 800
+    },
 });
 
-const wallStyle = { isStatic: true, render: { fillStyle: '#E68143' } };
-Composite.add(engine.world, [
-  Bodies.rectangle(WALL / 2, HEIGHT / 2, WALL, HEIGHT, wallStyle),
-  Bodies.rectangle(WIDTH - WALL / 2, HEIGHT / 2, WALL, HEIGHT, wallStyle),
-  Bodies.rectangle(WIDTH / 2, FLOOR_Y, WIDTH, WALL, wallStyle)
-]);
+const world = engine.world;
 
-const images = fruits.map(fruit => {
-  const image = new Image();
-  image.src = fruit.file;
-  return image;
+const leftWall = Bodies.rectangle(15, 395, 30, 790, {
+    isStatic: true,
+    render: { fillStyle: '#E68143' }
 });
 
-const queueContainer = document.getElementById('fruit-queue');
-const slots = Array.from({ length: 4 }, (_, i) => {
-  const wrapper = document.createElement('div');
-  wrapper.className = 'queue-slot';
-  const image = document.createElement('img');
-  const label = document.createElement('span');
-  label.textContent = i === 0 ? 'NEXT' : String(i + 1);
-  wrapper.append(image, label);
-  queueContainer.append(wrapper);
-  return image;
+const rightWall = Bodies.rectangle(605, 395, 30, 790, {
+    isStatic: true,
+    render: { fillStyle: '#E68143' }
 });
 
-const randomFruit = () => Math.floor(Math.random() * fruits.length);
-const queue = Array.from({ length: 4 }, randomFruit);
-const droppedFruits = [];
-let aimX = WIDTH / 2;
-let lastDropTime = -DROP_DELAY_MS;
+const topLine = Bodies.rectangle(310, 40, 620, 15, {
+    isStatic: true,
+    render: { fillStyle: '#E3E3E34' }
+});
 
-function updateQueue() {
-  queue.forEach((index, i) => {
-    slots[i].src = fruits[index].file;
-    slots[i].alt = fruits[index].name;
-  });
+const Ground = Bodies.rectangle(310, 790, 620, 30, {
+    isStatic: true,
+    render: { fillStyle: '#E68143' }
+});
+
+World.add(world, [leftWall, rightWall, Ground, topLine]);
+
+// Only the upcoming four fruit images are shown beside the original game.
+const fruitTypes = [
+    { file: '00_cherry.png', radius: 18 },
+    { file: '01_strawberry.png', radius: 24 },
+    { file: '02_grape.png', radius: 30 },
+    { file: '03_gyool.png', radius: 37 },
+    { file: '04_orange.png', radius: 45 }
+];
+const fruitImages = fruitTypes.map(fruit => {
+    const image = new Image();
+    image.src = fruit.file;
+    return image;
+});
+const randomFruit = () => Math.floor(Math.random() * fruitTypes.length);
+const nextFruits = Array.from({ length: 4 }, randomFruit);
+const queueContainer = document.createElement('div');
+queueContainer.style.display = 'inline-flex';
+queueContainer.style.flexDirection = 'column';
+queueContainer.style.verticalAlign = 'top';
+queueContainer.style.marginLeft = '16px';
+queueContainer.style.gap = '12px';
+
+const previewImages = Array.from({ length: 4 }, () => {
+    const image = document.createElement('img');
+    image.style.width = '72px';
+    image.style.height = '72px';
+    image.style.objectFit = 'contain';
+    queueContainer.appendChild(image);
+    return image;
+});
+
+render.canvas.style.verticalAlign = 'top';
+render.canvas.insertAdjacentElement('afterend', queueContainer);
+
+function updateFruitQueue() {
+    nextFruits.forEach((fruitIndex, index) => {
+        previewImages[index].src = fruitTypes[fruitIndex].file;
+    });
 }
+updateFruitQueue();
 
-function clampAim(x) {
-  const radius = fruits[queue[0]].radius;
-  return Math.max(WALL + radius, Math.min(WIDTH - WALL - radius, x));
-}
+const spawnedFruits = [];
+let lastSpawnTime = -350;
 
-function pointToAim(event) {
-  const rect = render.canvas.getBoundingClientRect();
-  aimX = clampAim((event.clientX - rect.left) * WIDTH / rect.width);
-}
-
-function dropFruit() {
-  const now = performance.now();
-  if (now - lastDropTime < DROP_DELAY_MS) return;
-  lastDropTime = now;
-
-  const fruitIndex = queue.shift();
-  const fruit = fruits[fruitIndex];
-  const x = Math.max(WALL + fruit.radius, Math.min(WIDTH - WALL - fruit.radius, aimX));
-  const body = Bodies.circle(x, SPAWN_Y, fruit.radius, {
-    restitution: 0.15,
-    friction: 0.6,
-    frictionStatic: 0.8,
-    render: { visible: false }
-  });
-  Composite.add(engine.world, body);
-  droppedFruits.push({ body, fruitIndex });
-
-  queue.push(randomFruit());
-  aimX = clampAim(aimX);
-  updateQueue();
-}
-
-render.canvas.addEventListener('pointermove', pointToAim);
 render.canvas.addEventListener('pointerdown', event => {
-  if (event.pointerType === 'mouse' && event.button !== 0) return;
-  pointToAim(event);
-  dropFruit();
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    const now = performance.now();
+    if (now - lastSpawnTime < 350) return;
+
+    const rect = render.canvas.getBoundingClientRect();
+    const fruitIndex = nextFruits.shift();
+    const fruit = fruitTypes[fruitIndex];
+    const pointerX = (event.clientX - rect.left) * (620 / rect.width);
+    const x = Math.max(30 + fruit.radius, Math.min(590 - fruit.radius, pointerX));
+
+    const body = Bodies.circle(x, 105, fruit.radius, {
+        restitution: 0.15,
+        friction: 0.6,
+        render: { visible: false }
+    });
+    World.add(world, body);
+    spawnedFruits.push({ body, fruitIndex });
+    nextFruits.push(randomFruit());
+    updateFruitQueue();
+    lastSpawnTime = now;
 });
 
-Events.on(render, 'afterRender', () => {
-  const ctx = render.context;
-  for (const { body, fruitIndex } of droppedFruits) {
-    const fruit = fruits[fruitIndex];
-    const image = images[fruitIndex];
-    if (!image.complete || image.naturalWidth === 0) continue;
-    ctx.save();
-    ctx.translate(body.position.x, body.position.y);
-    ctx.rotate(body.angle);
-    ctx.drawImage(image, -fruit.radius, -fruit.radius, fruit.radius * 2, fruit.radius * 2);
-    ctx.restore();
-  }
-
-  const nextFruit = fruits[queue[0]];
-  const preview = images[queue[0]];
-  const x = clampAim(aimX);
-  ctx.save();
-  ctx.strokeStyle = '#987e5b';
-  ctx.setLineDash([5, 7]);
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(x, SPAWN_Y + nextFruit.radius);
-  ctx.lineTo(x, FLOOR_Y - 16);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.globalAlpha = 0.65;
-  if (preview.complete && preview.naturalWidth > 0) {
-    ctx.drawImage(preview, x - nextFruit.radius, SPAWN_Y - nextFruit.radius,
-      nextFruit.radius * 2, nextFruit.radius * 2);
-  }
-  ctx.restore();
+// Draw the actual fruit PNGs over their Matter.js physics bodies.
+Matter.Events.on(render, 'afterRender', () => {
+    const ctx = render.context;
+    for (const { body, fruitIndex } of spawnedFruits) {
+        const image = fruitImages[fruitIndex];
+        if (!image.complete || !image.naturalWidth) continue;
+        const radius = fruitTypes[fruitIndex].radius;
+        ctx.save();
+        ctx.translate(body.position.x, body.position.y);
+        ctx.rotate(body.angle);
+        ctx.drawImage(image, -radius, -radius, radius * 2, radius * 2);
+        ctx.restore();
+    }
 });
 
-updateQueue();
 Render.run(render);
 Runner.run(Runner.create(), engine);
