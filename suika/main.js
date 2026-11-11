@@ -29,17 +29,16 @@ const rightWall = Bodies.rectangle(605, 395, 30, 790, {
     render: { fillStyle: '#E68143' }
 });
 
-const topLine = Bodies.rectangle(310, 40, 620, 15, {
-    isStatic: true,
-    render: { fillStyle: '#E3E3E34' }
-});
+// A thin dotted guide replaces the original solid top wall.
+const SPAWN_LINE_Y = 135;
+const SPAWN_Y = 85;
 
 const Ground = Bodies.rectangle(310, 790, 620, 30, {
     isStatic: true,
     render: { fillStyle: '#E68143' }
 });
 
-World.add(world, [leftWall, rightWall, Ground, topLine]);
+World.add(world, [leftWall, rightWall, Ground]);
 
 // Only the upcoming four fruit images are shown beside the original game.
 const fruitTypes = [
@@ -84,19 +83,29 @@ updateFruitQueue();
 
 const spawnedFruits = [];
 let lastSpawnTime = -350;
+let previewX = 310;
+
+function fruitX(clientX, fruitIndex) {
+    const rect = render.canvas.getBoundingClientRect();
+    const radius = fruitTypes[fruitIndex].radius;
+    const canvasX = (clientX - rect.left) * (620 / rect.width);
+    return Math.max(30 + radius, Math.min(590 - radius, canvasX));
+}
+
+render.canvas.addEventListener('pointermove', event => {
+    previewX = fruitX(event.clientX, nextFruits[0]);
+});
 
 render.canvas.addEventListener('pointerdown', event => {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     const now = performance.now();
     if (now - lastSpawnTime < 350) return;
 
-    const rect = render.canvas.getBoundingClientRect();
+    // Drop exactly the fruit currently shown above the dotted line.
+    previewX = fruitX(event.clientX, nextFruits[0]);
     const fruitIndex = nextFruits.shift();
     const fruit = fruitTypes[fruitIndex];
-    const pointerX = (event.clientX - rect.left) * (620 / rect.width);
-    const x = Math.max(30 + fruit.radius, Math.min(590 - fruit.radius, pointerX));
-
-    const body = Bodies.circle(x, 105, fruit.radius, {
+    const body = Bodies.circle(previewX, SPAWN_Y, fruit.radius, {
         restitution: 0.15,
         friction: 0.6,
         render: { visible: false }
@@ -105,12 +114,26 @@ render.canvas.addEventListener('pointerdown', event => {
     spawnedFruits.push({ body, fruitIndex });
     nextFruits.push(randomFruit());
     updateFruitQueue();
+    previewX = Math.max(30 + fruitTypes[nextFruits[0]].radius,
+        Math.min(590 - fruitTypes[nextFruits[0]].radius, previewX));
     lastSpawnTime = now;
 });
 
 // Draw the actual fruit PNGs over their Matter.js physics bodies.
 Matter.Events.on(render, 'afterRender', () => {
     const ctx = render.context;
+
+    // Only the line's position and stroke change; the game canvas stays the same.
+    ctx.save();
+    ctx.strokeStyle = '#E3E3E3';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([6, 6]);
+    ctx.beginPath();
+    ctx.moveTo(30, SPAWN_LINE_Y);
+    ctx.lineTo(590, SPAWN_LINE_Y);
+    ctx.stroke();
+    ctx.restore();
+
     for (const { body, fruitIndex } of spawnedFruits) {
         const image = fruitImages[fruitIndex];
         if (!image.complete || !image.naturalWidth) continue;
@@ -119,6 +142,18 @@ Matter.Events.on(render, 'afterRender', () => {
         ctx.translate(body.position.x, body.position.y);
         ctx.rotate(body.angle);
         ctx.drawImage(image, -radius, -radius, radius * 2, radius * 2);
+        ctx.restore();
+    }
+
+    // Show the next fruit fully opaque, above the dotted line.
+    const upcomingIndex = nextFruits[0];
+    const upcomingImage = fruitImages[upcomingIndex];
+    if (upcomingImage.complete && upcomingImage.naturalWidth) {
+        const radius = fruitTypes[upcomingIndex].radius;
+        ctx.save();
+        ctx.globalAlpha = 1;
+        ctx.drawImage(upcomingImage, previewX - radius, SPAWN_Y - radius,
+            radius * 2, radius * 2);
         ctx.restore();
     }
 });
