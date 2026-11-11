@@ -1,14 +1,51 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>수박게임</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>수박 게임</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #fff4dc; font-family: system-ui, sans-serif; color: #624129; }
+    main { max-width: 860px; margin: 24px auto; padding: 0 14px; }
+    h1 { font-size: 26px; }
+    .layout { display: flex; gap: 14px; align-items: flex-start; }
+    #game { flex: 1 1 620px; min-width: 0; }
+    #game canvas { display: block; width: 100%; height: auto; border-radius: 12px; touch-action: none; cursor: crosshair; }
+    aside { flex: 0 0 160px; padding: 12px; background: #fff9ed; border: 3px solid #e6ab72; border-radius: 16px; text-align: center; }
+    h2 { margin: 0 0 4px; font-size: 18px; }
+    aside p { margin: 0 0 12px; font-size: 12px; }
+    #fruit-queue { display: grid; gap: 10px; }
+    .queue-slot { height: 108px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: white; border: 2px solid #f0dfc9; border-radius: 12px; }
+    .queue-slot:first-child { background: #fff0dc; border-color: #e68143; }
+    .queue-slot img { width: 72px; height: 72px; object-fit: contain; }
+    .queue-slot span { font-size: 11px; font-weight: 700; }
+    .hint { font-size: 14px; }
+    @media (max-width: 650px) {
+      .layout { gap: 7px; }
+      aside { flex-basis: 98px; padding: 7px 4px; }
+      h2 { font-size: 13px; }
+      aside p { font-size: 10px; }
+      #fruit-queue { gap: 6px; }
+      .queue-slot { height: 73px; }
+      .queue-slot img { width: 45px; height: 45px; }
+    }
+  </style>
 </head>
 <body>
-    <h1>수박 게임이야!!!!!!!!!!!!!</h3>
-    <script src="matter.js"></script>
-    <script type="module" src="main.js"></script>
-
+  <main>
+    <h1>🍉 수박 게임</h1>
+    <div class="layout">
+      <div id="game" aria-label="과일 낙하 게임"></div>
+      <aside aria-label="다음 과일 목록">
+        <h2>다음 과일</h2>
+        <p>위부터 차례대로 등장</p>
+        <div id="fruit-queue" aria-live="polite"></div>
+      </aside>
+    </div>
+    <p class="hint">클릭 또는 터치로 과일을 떨어뜨리세요. 오른쪽 맨 위가 다음 과일입니다.</p>
+  </main>
+  <script src="matter.js"></script>
+  <script src="main.js"></script>
 </body>
 </html>
